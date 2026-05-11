@@ -1,525 +1,302 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TrafficOS — Smart Junction Control</title>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --bg:#080c10;--surface:#0d1318;--border:#1a2530;
-      --accent:#00e5ff;--green:#00ff88;--red:#ff3b3b;
-      --yellow:#ffd600;--amber:#ff8c00;--text:#c8d8e8;--muted:#4a6070;
-      --font-mono:'Share Tech Mono',monospace;
-      --font-main:'Barlow',sans-serif;
-      --font-cond:'Barlow Condensed',sans-serif;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--bg);color:var(--text);font-family:var(--font-main);min-height:100vh;overflow-x:hidden}
-    body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,.015) 2px,rgba(0,229,255,.015) 4px);pointer-events:none;z-index:9999}
+<meta charset="UTF-8">
+<title>Smart Traffic System — Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+  body { background: #0f1419; color: #e6e6e6; padding: 20px; }
+  h1 { color: #4ade80; margin-bottom: 6px; }
+  .subtitle { color: #888; margin-bottom: 20px; font-size: 14px; }
 
-    header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(13,19,24,.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
-    .logo{display:flex;align-items:center;gap:12px}
-    .logo-icon{width:36px;height:36px;border:2px solid var(--accent);border-radius:6px;display:grid;place-items:center;animation:pulse-border 2.5s ease-in-out infinite}
-    @keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,.4)}50%{box-shadow:0 0 0 6px rgba(0,229,255,0)}}
-    .logo-icon svg{width:20px;height:20px;fill:var(--accent)}
-    .logo-text{font-family:var(--font-cond);font-weight:900;font-size:20px;letter-spacing:2px;color:#fff}
-    .logo-text span{color:var(--accent)}
-    .header-right{display:flex;align-items:center;gap:20px}
-    .sys-time{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
-    .status-pill{display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--green);border-radius:20px;font-size:11px;font-weight:600;color:var(--green);letter-spacing:1px;text-transform:uppercase}
-    .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 1.2s ease-in-out infinite}
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: #1a2028;
+    border: 1px solid #2d3640;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .card h2 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #4ade80;
+    border-bottom: 1px solid #2d3640;
+    padding-bottom: 8px;
+  }
 
-    main{padding:22px 28px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;max-width:1400px;margin:0 auto}
+  /* Signals row */
+  .signals { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  .signal {
+    background: #0f1419;
+    border: 1px solid #2d3640;
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+  }
+  .signal .name { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .lights { display: flex; flex-direction: column; gap: 3px; align-items: center; }
+  .light {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #2d3640; transition: 0.2s;
+  }
+  .light.red.on    { background: #ef4444; box-shadow: 0 0 12px #ef4444; }
+  .light.yellow.on { background: #facc15; box-shadow: 0 0 12px #facc15; }
+  .light.green.on  { background: #4ade80; box-shadow: 0 0 12px #4ade80; }
 
-    .stats-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:6px;animation:fadeUp .5s ease both;position:relative;overflow:hidden}
-    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.4}
-    .stat-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
-    .stat-value{font-family:var(--font-cond);font-size:38px;font-weight:900;line-height:1;color:#fff}
-    .stat-value.accent{color:var(--accent)}.stat-value.green{color:var(--green)}.stat-value.red{color:var(--red)}.stat-value.amber{color:var(--amber)}
-    .stat-sub{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+  /* Cameras (4) */
+  .cameras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cam {
+    background: #0f1419;
+    border: 1px solid #2d3640;
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .cam .name { font-weight: bold; color: #4ade80; margin-bottom: 4px; }
+  .cam .stat { font-size: 13px; color: #ccc; }
+  .cam .alert { color: #ef4444; font-weight: bold; }
+  .cam .actions { margin-top: 6px; }
+  .cam button {
+    font-size: 11px; padding: 4px 8px; margin-right: 4px;
+    background: #2d3640; color: #e6e6e6;
+    border: 1px solid #444; border-radius: 4px;
+    cursor: pointer;
+  }
+  .cam button:hover { background: #3a4450; }
+  .cam button.danger { border-color: #ef4444; color: #ef4444; }
 
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden;animation:fadeUp .5s ease both}
-    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.35}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    .card-title{font-family:var(--font-cond);font-weight:700;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px}
-    .card-title::before{content:'';width:3px;height:12px;background:var(--accent);border-radius:2px}
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  .controls button {
+    padding: 8px 14px;
+    background: #2d3640;
+    color: #e6e6e6;
+    border: 1px solid #444;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .controls button:hover { background: #3a4450; }
+  .controls button.allred { border-color: #ef4444; color: #ef4444; }
+  .controls button.auto   { border-color: #4ade80; color: #4ade80; }
 
-    .intersection-card{grid-column:1/3}
-    .intersection{display:grid;grid-template-columns:1fr 70px 1fr;grid-template-rows:1fr 70px 1fr;width:100%;aspect-ratio:1;max-width:340px;margin:0 auto}
-    .road-cell{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px}
-    .center-box{background:#111820;border:1px solid var(--border);border-radius:4px;display:grid;place-items:center}
-    .center-box span{font-family:var(--font-mono);font-size:8px;color:var(--muted);letter-spacing:1px}
-    .tl-widget{display:flex;flex-direction:column;align-items:center;gap:4px}
-    .tl-box{background:#060a0e;border:1px solid var(--border);border-radius:6px;padding:5px 4px;display:flex;flex-direction:column;gap:4px;align-items:center}
-    .tl-box.horiz{flex-direction:row;padding:4px 6px}
-    .tl-light{width:13px;height:13px;border-radius:50%;background:#1a2530;transition:all .4s ease}
-    .tl-light.on-red{background:var(--red);box-shadow:0 0 10px var(--red)}
-    .tl-light.on-yellow{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
-    .tl-light.on-green{background:var(--green);box-shadow:0 0 10px var(--green)}
-    .tl-road-name{font-family:var(--font-mono);font-size:8px;color:var(--muted);text-align:center}
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px; text-align: left; border-bottom: 1px solid #2d3640; }
+  th { color: #888; font-weight: normal; }
 
-    .green-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
-    .green-bar-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);width:48px;flex-shrink:0}
-    .green-bar-track{flex:1;height:6px;background:#1a2530;border-radius:3px;overflow:hidden}
-    .green-bar-fill{height:100%;background:var(--green);border-radius:3px;transition:width 1s ease}
-    .green-bar-fill.reduced{background:var(--red)}.green-bar-fill.boosted{background:var(--accent)}
-    .green-bar-val{font-family:var(--font-mono);font-size:10px;color:var(--text);width:28px;text-align:right}
+  /* Search */
+  .search { display: flex; gap: 8px; margin-bottom: 12px; }
+  .search input {
+    flex: 1; padding: 8px;
+    background: #0f1419; color: #e6e6e6;
+    border: 1px solid #2d3640; border-radius: 5px;
+  }
+  .search button {
+    padding: 8px 14px; background: #4ade80; color: #0f1419;
+    border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
+  }
+  .results { max-height: 200px; overflow-y: auto; }
 
-    .alert-panel{display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto}
-    .alert-panel::-webkit-scrollbar{width:3px}.alert-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-    .alert-item{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:7px;border:1px solid transparent;font-size:11px;animation:slideIn .3s ease}
-    @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-    .alert-item.ambulance{background:rgba(255,59,59,.08);border-color:rgba(255,59,59,.25)}
-    .alert-item.congestion{background:rgba(255,214,0,.06);border-color:rgba(255,214,0,.2)}
-    .alert-item.plate{background:rgba(0,229,255,.05);border-color:rgba(0,229,255,.15)}
-    .alert-icon{font-size:15px;flex-shrink:0;margin-top:1px}
-    .alert-msg{color:var(--text);line-height:1.4}
-    .alert-time{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px}
-
-    .search-card{grid-column:1/-1}
-    .search-row{display:flex;gap:10px;margin-bottom:18px}
-    .search-input{flex:1;background:#060a0e;border:1px solid var(--border);border-radius:7px;padding:11px 16px;font-family:var(--font-mono);font-size:15px;color:#fff;letter-spacing:2px;text-transform:uppercase;outline:none;transition:border-color .2s}
-    .search-input:focus{border-color:var(--accent)}
-    .search-input::placeholder{color:var(--muted);letter-spacing:1px;font-size:12px}
-    .btn{padding:11px 22px;border:none;border-radius:7px;font-family:var(--font-cond);font-weight:700;font-size:13px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s}
-    .btn-primary{background:var(--accent);color:#000}
-    .btn-primary:hover{background:#33ecff;box-shadow:0 0 20px rgba(0,229,255,.4)}
-    .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
-    .btn-ghost:hover{border-color:var(--text);color:var(--text)}
-    .result-area{min-height:60px}
-    .no-result{font-family:var(--font-mono);font-size:12px;color:var(--muted);padding:16px 0;text-align:center}
-    .result-plate-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
-    .plate-badge{background:#060a0e;border:2px solid var(--accent);border-radius:6px;padding:7px 16px;font-family:var(--font-mono);font-size:18px;letter-spacing:4px;color:var(--accent)}
-    .plate-count{font-size:12px;color:var(--muted)}
-    .timeline{display:flex;flex-direction:column;position:relative;padding-left:20px}
-    .timeline::before{content:'';position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:var(--border)}
-    .tl-event{display:flex;align-items:flex-start;gap:14px;padding:9px 0;position:relative}
-    .tl-dot{width:15px;height:15px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);flex-shrink:0;margin-left:-27px;margin-top:2px;box-shadow:0 0 8px rgba(0,229,255,.5)}
-    .tl-content{flex:1}
-    .tl-signal{font-weight:700;color:#fff;font-size:13px}
-    .tl-road{color:var(--muted);font-size:11px;margin-top:2px}
-    .tl-ts{font-family:var(--font-mono);font-size:10px;color:var(--accent)}
-
-    .plate-log-card{grid-column:1/3}
-    .table-wrap{overflow-x:auto;max-height:220px;overflow-y:auto}
-    .table-wrap::-webkit-scrollbar{height:3px;width:3px}.table-wrap::-webkit-scrollbar-thumb{background:var(--border)}
-    table{width:100%;border-collapse:collapse;font-size:11px}
-    thead th{font-family:var(--font-cond);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
-    tbody tr{border-bottom:1px solid rgba(26,37,48,.5);transition:background .15s}
-    tbody tr:hover{background:rgba(0,229,255,.04)}
-    td{padding:8px 10px;color:var(--text);font-family:var(--font-mono);font-size:11px}
-    td.plate-cell{color:var(--accent);font-weight:bold;letter-spacing:1.5px}
-    td.signal-cell{color:var(--green)}
-
-    .amb-inactive{text-align:center;padding:20px;font-family:var(--font-mono);font-size:12px;color:var(--muted)}
-    .amb-active{text-align:center;padding:20px;animation:amb-pulse .8s ease infinite alternate}
-    @keyframes amb-pulse{from{opacity:.7}to{opacity:1}}
-    .amb-active .amb-icon{font-size:32px;display:block;margin-bottom:6px}
-    .amb-active .amb-road{font-family:var(--font-cond);font-size:20px;font-weight:900;color:var(--red);letter-spacing:2px}
-
-    footer{text-align:center;padding:18px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:10px;color:var(--muted)}
-
-    @media(max-width:800px){
-      main{grid-template-columns:1fr;padding:14px}
-      .stats-row{grid-template-columns:1fr 1fr}
-      .intersection-card,.plate-log-card,.search-card{grid-column:1}
-    }
-  </style>
+  .badge {
+    display: inline-block; padding: 2px 6px; border-radius: 3px;
+    font-size: 11px; font-weight: bold;
+  }
+  .badge.red { background: #ef4444; color: white; }
+  .badge.yellow { background: #facc15; color: black; }
+  .badge.green { background: #4ade80; color: black; }
+</style>
 </head>
 <body>
 
-<header>
-  <div class="logo">
-    <div class="logo-icon">
-      <svg viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.18L20 8.5v7L12 19.82 4 15.5v-7L12 4.18z"/></svg>
-    </div>
-    <div class="logo-text">TRAFFIC<span>OS</span></div>
-  </div>
-  <div class="header-right">
-    <div class="sys-time" id="clock">--:--:--</div>
-    <div class="status-pill"><div class="status-dot"></div>DEMO MODE</div>
-  </div>
-</header>
+<h1>🚦 Smart Traffic System</h1>
+<div class="subtitle">8 signals • 4 cameras • ESP32 controlled</div>
 
-<main>
+<!-- Signal indicators -->
+<div class="card" style="margin-bottom:20px;">
+  <h2>Signal States</h2>
+  <div class="signals" id="signals"></div>
+</div>
 
-  <!-- STATS -->
-  <div class="stats-row">
-    <div class="stat-card" style="animation-delay:.05s">
-      <div class="stat-label">Plates Logged</div>
-      <div class="stat-value accent" id="stat-plates">247</div>
-      <div class="stat-sub">total vehicles</div>
-    </div>
-    <div class="stat-card" style="animation-delay:.10s">
-      <div class="stat-label">Ambulance Events</div>
-      <div class="stat-value red" id="stat-amb">3</div>
-      <div class="stat-sub">priority overrides</div>
-    </div>
-    <div class="stat-card" style="animation-delay:.15s">
-      <div class="stat-label">Congestion Events</div>
-      <div class="stat-value amber" id="stat-cong">8</div>
-      <div class="stat-sub">diversion triggered</div>
-    </div>
-    <div class="stat-card" style="animation-delay:.20s">
-      <div class="stat-label">Accidents Detected</div>
-      <div class="stat-value green" id="stat-acc">1</div>
-      <div class="stat-sub">route blocked</div>
+<div class="grid">
+  <!-- Cameras -->
+  <div class="card">
+    <h2>Cameras</h2>
+    <div class="cameras" id="cameras"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card">
+    <h2>Manual Controls</h2>
+    <div class="controls" id="controls"></div>
+    <hr style="margin:12px 0; border-color:#2d3640;">
+    <div class="controls">
+      <button class="auto"  onclick="setAuto()">▶ Auto Mode</button>
+      <button class="allred" onclick="allRed()">⛔ ALL RED</button>
     </div>
   </div>
 
-  <!-- INTERSECTION -->
-  <div class="card intersection-card" style="animation-delay:.05s">
-    <div class="card-title">Live Intersection</div>
-    <div class="intersection">
-      <div></div>
-      <div class="road-cell" style="justify-content:flex-end;padding-bottom:4px">
-        <div class="tl-widget">
-          <div class="tl-box">
-            <div class="tl-light" id="tl-0-red"></div>
-            <div class="tl-light" id="tl-0-yellow"></div>
-            <div class="tl-light" id="tl-0-green"></div>
-          </div>
-          <div class="tl-road-name">NORTH</div>
-        </div>
-      </div>
-      <div></div>
-
-      <div class="road-cell" style="justify-content:flex-end;padding-right:4px;flex-direction:row">
-        <div class="tl-widget" style="flex-direction:row-reverse;gap:5px">
-          <div class="tl-box horiz">
-            <div class="tl-light" id="tl-3-red"></div>
-            <div class="tl-light" id="tl-3-yellow"></div>
-            <div class="tl-light" id="tl-3-green"></div>
-          </div>
-          <div class="tl-road-name">WEST</div>
-        </div>
-      </div>
-      <div class="center-box"><span>JUNCTION</span></div>
-      <div class="road-cell" style="justify-content:flex-start;padding-left:4px;flex-direction:row">
-        <div class="tl-widget" style="flex-direction:row;gap:5px">
-          <div class="tl-box horiz">
-            <div class="tl-light" id="tl-1-red"></div>
-            <div class="tl-light" id="tl-1-yellow"></div>
-            <div class="tl-light" id="tl-1-green"></div>
-          </div>
-          <div class="tl-road-name">EAST</div>
-        </div>
-      </div>
-
-      <div></div>
-      <div class="road-cell" style="justify-content:flex-start;padding-top:4px">
-        <div class="tl-widget">
-          <div class="tl-road-name">SOUTH</div>
-          <div class="tl-box">
-            <div class="tl-light" id="tl-2-green"></div>
-            <div class="tl-light" id="tl-2-yellow"></div>
-            <div class="tl-light" id="tl-2-red"></div>
-          </div>
-        </div>
-      </div>
-      <div></div>
+  <!-- Plate Search -->
+  <div class="card">
+    <h2>Vehicle Search (Plate Trail)</h2>
+    <div class="search">
+      <input id="plateInput" placeholder="e.g. TN09AB1234" />
+      <button onclick="searchPlate()">🔍 Search</button>
     </div>
-
-    <div style="margin-top:20px">
-      <div class="card-title" style="margin-bottom:10px">Green Time Allocation</div>
-      <div id="green-bars"></div>
+    <div class="results" id="searchResults">
+      <p style="color:#888;font-size:13px;">Enter a plate number to trace its journey.</p>
     </div>
   </div>
 
-  <!-- AMBULANCE + ALERTS -->
-  <div class="card" style="animation-delay:.10s">
-    <div class="card-title">Ambulance Status</div>
-    <div id="amb-status" class="amb-inactive">No ambulance detected</div>
-    <div class="card-title" style="margin-top:16px">Live Alerts</div>
-    <div class="alert-panel" id="alert-panel">
-      <div class="no-result">Monitoring all 4 roads...</div>
-    </div>
+  <!-- Recent Events -->
+  <div class="card">
+    <h2>Recent Events</h2>
+    <table id="eventsTable">
+      <thead><tr><th>Time</th><th>Type</th><th>Camera</th><th>Detail</th></tr></thead>
+      <tbody></tbody>
+    </table>
   </div>
+</div>
 
-  <!-- PLATE SEARCH -->
-  <div class="card search-card" style="animation-delay:.15s">
-    <div class="card-title">Vehicle Plate Search — Theft Tracking</div>
-    <div class="search-row">
-      <input class="search-input" id="plate-input" type="text" placeholder="Enter plate e.g. TN09AB1234" maxlength="16"/>
-      <button class="btn btn-primary" onclick="searchPlate()">SEARCH</button>
-      <button class="btn btn-ghost" onclick="clearSearch()">CLEAR</button>
-    </div>
-    <div class="result-area" id="result-area">
-      <div class="no-result">Enter a plate number to trace vehicle movement across all signals</div>
-    </div>
-  </div>
-
-  <!-- PLATE LOG -->
-  <div class="card plate-log-card" style="animation-delay:.20s">
-    <div class="card-title">Recent Plate Log</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Plate</th><th>Signal</th><th>Road</th><th>Timestamp</th></tr></thead>
-        <tbody id="plate-table-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- EVENT LOG -->
-  <div class="card" style="animation-delay:.25s">
-    <div class="card-title">Congestion & Diversion Log</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Road</th><th>Type</th><th>Vehicles</th><th>Diverted To</th></tr></thead>
-        <tbody id="event-table-body"></tbody>
-      </table>
-    </div>
-  </div>
-
-</main>
-
-<footer>TRAFFICIOS v1.0 &nbsp;·&nbsp; Raspberry Pi 4 &nbsp;·&nbsp; 4-Road Smart Junction &nbsp;·&nbsp; DEMO MODE</footer>
+<!-- Recent Plates -->
+<div class="card">
+  <h2>Recent Plates</h2>
+  <table id="platesTable">
+    <thead><tr><th>Time</th><th>Plate</th><th>Camera</th><th>Signal</th><th>State</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
 
 <script>
-const ROAD_NAMES = ['North','East','South','West'];
-const MAX_GREEN  = 60;
+const NUM_SIGNALS = 8;
+const NUM_CAMERAS = 4;
 
-// ── CLOCK ──
-setInterval(() => {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
-}, 1000);
-document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+// Build signal grid once
+const sigGrid = document.getElementById("signals");
+for (let i = 0; i < NUM_SIGNALS; i++) {
+  sigGrid.innerHTML += `
+    <div class="signal">
+      <div class="name">S${i+1}</div>
+      <div class="lights">
+        <div class="light red"    id="s${i}-red"></div>
+        <div class="light yellow" id="s${i}-yellow"></div>
+        <div class="light green"  id="s${i}-green"></div>
+      </div>
+    </div>`;
+}
 
-// ── DEMO DATA ──
-const demoPlates = [
-  {plate:'TN09AB1234',signal_id:'SIGNAL_1',road_name:'North',timestamp:'2024-01-15 08:32:10'},
-  {plate:'KA05MN5678',signal_id:'SIGNAL_2',road_name:'East', timestamp:'2024-01-15 09:10:33'},
-  {plate:'MH01AB0001',signal_id:'SIGNAL_3',road_name:'South',timestamp:'2024-01-15 10:15:08'},
-  {plate:'DL3CAB4321',signal_id:'SIGNAL_1',road_name:'North',timestamp:'2024-01-15 11:00:00'},
-  {plate:'TN09AB1234',signal_id:'SIGNAL_2',road_name:'East', timestamp:'2024-01-15 11:20:30'},
-  {plate:'TN22XY9999',signal_id:'SIGNAL_3',road_name:'South',timestamp:'2024-01-15 10:05:17'},
-  {plate:'MH01AB0001',signal_id:'SIGNAL_4',road_name:'West', timestamp:'2024-01-15 10:30:55'},
-  {plate:'KA05MN5678',signal_id:'SIGNAL_1',road_name:'North',timestamp:'2024-01-15 09:25:44'},
-  {plate:'TN09AB1234',signal_id:'SIGNAL_3',road_name:'South',timestamp:'2024-01-15 08:47:22'},
-  {plate:'TN09AB1234',signal_id:'SIGNAL_4',road_name:'West', timestamp:'2024-01-15 09:01:05'},
-];
+// Build camera cards once
+const camGrid = document.getElementById("cameras");
+for (let i = 0; i < NUM_CAMERAS; i++) {
+  camGrid.innerHTML += `
+    <div class="cam" id="cam-${i}">
+      <div class="name" id="cam-${i}-name">Cam ${i}</div>
+      <div class="stat" id="cam-${i}-stat">Vehicles: 0</div>
+      <div class="stat" id="cam-${i}-flags"></div>
+      <div class="actions">
+        <button class="danger" onclick="reportAccident(${i})">⚠ Accident</button>
+        <button onclick="clearAccident(${i})">✓ Clear</button>
+      </div>
+    </div>`;
+}
 
-const demoEvents = [
-  {road_name:'North',event_type:'congestion',vehicle_count:14,diverted_to:'East'},
-  {road_name:'South',event_type:'accident',  vehicle_count:19,diverted_to:'East, West'},
-  {road_name:'West', event_type:'congestion',vehicle_count:10,diverted_to:'North'},
-];
+// Build manual override buttons (1 per cam)
+const ctrl = document.getElementById("controls");
+for (let i = 0; i < NUM_CAMERAS; i++) {
+  ctrl.innerHTML += `<button onclick="override(${i})">Force GREEN: Cam ${i}</button>`;
+}
 
-// Vehicle journey data for search
-const journeys = {
-  'TN09AB1234': [
-    {signal_id:'SIGNAL_1',road_name:'North',timestamp:'2024-01-15 08:32:10'},
-    {signal_id:'SIGNAL_3',road_name:'South',timestamp:'2024-01-15 08:47:22'},
-    {signal_id:'SIGNAL_4',road_name:'West', timestamp:'2024-01-15 09:01:05'},
-    {signal_id:'SIGNAL_2',road_name:'East', timestamp:'2024-01-15 11:20:30'},
-  ],
-  'KA05MN5678': [
-    {signal_id:'SIGNAL_2',road_name:'East', timestamp:'2024-01-15 09:10:33'},
-    {signal_id:'SIGNAL_1',road_name:'North',timestamp:'2024-01-15 09:25:44'},
-  ],
-  'MH01AB0001': [
-    {signal_id:'SIGNAL_2',road_name:'East', timestamp:'2024-01-15 10:15:08'},
-    {signal_id:'SIGNAL_4',road_name:'West', timestamp:'2024-01-15 10:30:55'},
-  ],
-};
+// ── API helpers ──
+async function fetchJSON(url) {
+  try { return await (await fetch(url)).json(); }
+  catch (e) { return null; }
+}
 
-// ── SIGNAL LIGHTS ──
-function setSignal(road, color) {
-  ['red','yellow','green'].forEach(c => {
-    const el = document.getElementById(`tl-${road}-${c}`);
-    if (el) el.className = 'tl-light' + (c === color ? ` on-${c}` : '');
+async function override(cam)        { await fetchJSON(`/api/override/${cam}`); }
+async function setAuto()             { await fetchJSON("/api/auto"); }
+async function allRed()              { await fetchJSON("/api/allred"); }
+async function reportAccident(cam)   { await fetchJSON(`/api/accident/${cam}`); }
+async function clearAccident(cam)    { await fetchJSON(`/api/accident_clear/${cam}`); }
+
+async function searchPlate() {
+  const plate = document.getElementById("plateInput").value.trim().toUpperCase();
+  if (!plate) return;
+  const data = await fetchJSON(`/api/search/${plate}`);
+  const box = document.getElementById("searchResults");
+  if (!data || data.length === 0) {
+    box.innerHTML = `<p style="color:#ef4444;">No record of plate "${plate}"</p>`;
+    return;
+  }
+  let html = `<table><thead><tr><th>Time</th><th>Camera</th><th>Signal</th><th>State</th></tr></thead><tbody>`;
+  data.forEach(row => {
+    const t = (row.timestamp || row[4] || "").substring(0, 19);
+    const cam = row.road || row[1] || "";
+    const sig = row.signal_id || row[2] || "";
+    const st  = row.state || row[3] || "";
+    html += `<tr><td>${t}</td><td>${cam}</td><td>${sig}</td><td><span class="badge ${st}">${st}</span></td></tr>`;
+  });
+  html += "</tbody></table>";
+  box.innerHTML = html;
+}
+
+// ── Refresh loop ──
+async function refresh() {
+  const status = await fetchJSON("/api/status");
+  if (!status) return;
+
+  // Signals
+  const states = status.signal_state || [];
+  for (let i = 0; i < NUM_SIGNALS; i++) {
+    const st = states[i] || "red";
+    ["red","yellow","green"].forEach(c => {
+      const el = document.getElementById(`s${i}-${c}`);
+      if (el) el.classList.toggle("on", c === st);
+    });
+  }
+
+  // Cameras
+  const counts = status.vehicle_counts || [];
+  const camNames = status.cam_names || [];
+  const accs = status.accident_flags || [];
+  const congs = status.congestion_alerts || [];
+  const ambCam = status.ambulance_cam;
+  for (let i = 0; i < NUM_CAMERAS; i++) {
+    document.getElementById(`cam-${i}-name`).textContent = `Cam ${i} — ${camNames[i] || ""}`;
+    document.getElementById(`cam-${i}-stat`).textContent = `Vehicles: ${counts[i] || 0}`;
+    let flags = [];
+    if (ambCam === i)  flags.push('<span class="alert">🚨 AMBULANCE</span>');
+    if (accs[i])       flags.push('<span class="alert">⚠ ACCIDENT</span>');
+    if (congs[i])      flags.push('<span class="alert">🚗 CONGESTED</span>');
+    document.getElementById(`cam-${i}-flags`).innerHTML = flags.join(" ");
+  }
+
+  // Events
+  const events = await fetchJSON("/api/events") || [];
+  const evtBody = document.querySelector("#eventsTable tbody");
+  evtBody.innerHTML = "";
+  events.forEach(e => {
+    const t = (e.timestamp || e[4] || "").substring(0, 19);
+    evtBody.innerHTML += `<tr><td>${t}</td><td>${e.event_type || e[1]}</td><td>${e.road || e[2]}</td><td>${e.detail || e[3] || ""}</td></tr>`;
+  });
+
+  // Plates
+  const plates = await fetchJSON("/api/plates") || [];
+  const plBody = document.querySelector("#platesTable tbody");
+  plBody.innerHTML = "";
+  plates.forEach(p => {
+    const t = (p.timestamp || p[4] || "").substring(0, 19);
+    const st = p.state || p[3] || "";
+    plBody.innerHTML += `<tr><td>${t}</td><td><b>${p.plate || p[0]}</b></td><td>${p.road || p[1]}</td><td>${p.signal_id || p[2]}</td><td><span class="badge ${st}">${st}</span></td></tr>`;
   });
 }
 
-function allRed() {
-  for (let i = 0; i < 4; i++) setSignal(i, 'red');
-}
-
-// ── GREEN TIME BARS ──
-let greenTimes = {North:30,East:30,South:30,West:30};
-
-function renderGreenBars() {
-  const c = document.getElementById('green-bars');
-  c.innerHTML = ROAD_NAMES.map(name => {
-    const s   = greenTimes[name] ?? 30;
-    const pct = Math.min((s / MAX_GREEN) * 100, 100);
-    const cls = s <= 10 ? 'reduced' : s >= 45 ? 'boosted' : '';
-    return `<div class="green-bar-row">
-      <div class="green-bar-label">${name}</div>
-      <div class="green-bar-track"><div class="green-bar-fill ${cls}" style="width:${pct}%"></div></div>
-      <div class="green-bar-val">${s}s</div>
-    </div>`;
-  }).join('');
-}
-
-// ── ALERTS ──
-const alerts = [];
-function pushAlert(type, msg) {
-  const time = new Date().toLocaleTimeString('en-GB');
-  alerts.unshift({type, msg, time});
-  if (alerts.length > 20) alerts.pop();
-  renderAlerts();
-}
-
-function renderAlerts() {
-  const p = document.getElementById('alert-panel');
-  if (!alerts.length) { p.innerHTML = '<div class="no-result">Monitoring all 4 roads...</div>'; return; }
-  p.innerHTML = alerts.map(a => {
-    const icon = a.type === 'ambulance' ? '🚨' : a.type === 'congestion' ? '⚠️' : '📋';
-    return `<div class="alert-item ${a.type}">
-      <span class="alert-icon">${icon}</span>
-      <div><div class="alert-msg">${a.msg}</div><div class="alert-time">${a.time}</div></div>
-    </div>`;
-  }).join('');
-}
-
-// ── PLATE TABLE ──
-function renderPlateTable() {
-  document.getElementById('plate-table-body').innerHTML =
-    demoPlates.map(p => `<tr>
-      <td class="plate-cell">${p.plate}</td>
-      <td class="signal-cell">${p.signal_id}</td>
-      <td>${p.road_name}</td>
-      <td>${p.timestamp}</td>
-    </tr>`).join('');
-}
-
-// ── EVENT TABLE ──
-function renderEventTable() {
-  document.getElementById('event-table-body').innerHTML =
-    demoEvents.map(e => {
-      const col = e.event_type === 'accident' ? 'var(--red)' : 'var(--amber)';
-      return `<tr>
-        <td>${e.road_name}</td>
-        <td style="color:${col};font-weight:700;font-size:9px;text-transform:uppercase">${e.event_type}</td>
-        <td>${e.vehicle_count}</td>
-        <td style="color:var(--green)">${e.diverted_to}</td>
-      </tr>`;
-    }).join('');
-}
-
-// ── PLATE SEARCH ──
-function searchPlate() {
-  const plate = document.getElementById('plate-input').value.trim().toUpperCase();
-  const area  = document.getElementById('result-area');
-  if (!plate) return;
-
-  const records = journeys[plate];
-  if (!records) {
-    area.innerHTML = `<div class="no-result">No records found for <span style="color:var(--accent)">${plate}</span></div>`;
-    return;
-  }
-
-  const items = records.map(r => `
-    <div class="tl-event">
-      <div class="tl-dot"></div>
-      <div class="tl-content">
-        <div class="tl-signal">${r.signal_id}</div>
-        <div class="tl-road">${r.road_name} Road</div>
-        <div class="tl-ts">${r.timestamp}</div>
-      </div>
-    </div>`).join('');
-
-  area.innerHTML = `
-    <div class="result-plate-header">
-      <div class="plate-badge">${plate}</div>
-      <div class="plate-count">${records.length} signal${records.length > 1 ? 's' : ''} passed</div>
-    </div>
-    <div class="timeline">${items}</div>`;
-
-  pushAlert('plate', `🔍 Plate search: ${plate} — ${records.length} records found`);
-}
-
-function clearSearch() {
-  document.getElementById('plate-input').value = '';
-  document.getElementById('result-area').innerHTML =
-    '<div class="no-result">Enter a plate number to trace vehicle movement across all signals</div>';
-}
-
-document.getElementById('plate-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') searchPlate();
-});
-
-// ── DEMO SIMULATION ──
-const phases = [
-  // [road getting green, duration ms, greenTimes override, ambulance]
-  {green:0, dur:4000, times:{North:30,East:30,South:30,West:30}, amb:false},
-  {green:1, dur:4000, times:{North:30,East:30,South:30,West:30}, amb:false},
-  {green:0, dur:5000, times:{North:45,East:45,South:10,West:10}, amb:true,  ambRoad:0},  // Ambulance!
-  {green:2, dur:4000, times:{North:30,East:30,South:30,West:30}, amb:false},
-  {green:3, dur:4000, times:{North:30,East:30,South:30,West:30}, amb:false},
-  {green:1, dur:4000, times:{North:10,East:45,South:30,West:10}, amb:false}, // Congestion on North
-];
-
-let phaseIdx = 0;
-let plateIdx = 0;
-
-function runPhase() {
-  const p = phases[phaseIdx];
-  greenTimes = {...p.times};
-  renderGreenBars();
-
-  // Lights
-  allRed();
-  setTimeout(() => {
-    if (p.amb) {
-      // Ambulance override
-      const el = document.getElementById('amb-status');
-      el.className = 'amb-active';
-      el.innerHTML = `<span class="amb-icon">🚨</span>
-        <div class="amb-road">AMBULANCE ON ${ROAD_NAMES[p.ambRoad].toUpperCase()}</div>
-        <div style="font-size:11px;color:var(--text);margin-top:4px">Priority GREEN active</div>`;
-      pushAlert('ambulance', `🚨 Ambulance detected on ${ROAD_NAMES[p.ambRoad]} — Priority GREEN activated`);
-    } else {
-      document.getElementById('amb-status').className = 'amb-inactive';
-      document.getElementById('amb-status').textContent = 'No ambulance detected';
-    }
-
-    // Check for congestion phase
-    if (p.times.North === 10 && !p.amb) {
-      pushAlert('congestion', '⚠️ North road congested (14 vehicles) — Traffic diverted to East');
-    }
-
-    setSignal(p.green, 'green');
-  }, 600);
-
-  // Yellow before switching
-  setTimeout(() => {
-    setSignal(p.green, 'yellow');
-  }, p.dur - 800);
-
-  // Add a plate log entry
-  setTimeout(() => {
-    const newPlate = {
-      plate: ['TN09AB1234','KA05MN5678','MH01AB0001','DL3CAB4321','TN22XY9999'][Math.floor(Math.random()*5)],
-      signal_id: `SIGNAL_${p.green+1}`,
-      road_name: ROAD_NAMES[p.green],
-      timestamp: new Date().toLocaleString('en-GB').replace(',','')
-    };
-    demoPlates.unshift(newPlate);
-    if (demoPlates.length > 12) demoPlates.pop();
-    renderPlateTable();
-    document.getElementById('stat-plates').textContent =
-      parseInt(document.getElementById('stat-plates').textContent) + 1;
-  }, p.dur / 2);
-
-  phaseIdx = (phaseIdx + 1) % phases.length;
-  setTimeout(runPhase, p.dur);
-}
-
-// Init
-renderPlateTable();
-renderEventTable();
-renderGreenBars();
-allRed();
-setTimeout(runPhase, 800);
-
-// Initial alert
-setTimeout(() => pushAlert('plate','📋 System started — monitoring 4 roads'), 1500);
-setTimeout(() => pushAlert('congestion','⚠️ South road: accident detected, East+West boosted'), 3000);
+refresh();
+setInterval(refresh, 1500);
 </script>
+
 </body>
 </html>
