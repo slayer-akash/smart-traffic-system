@@ -1,3 +1,139 @@
-webcam should rec all the number plates and update in the database, so if any vehicle gets lost we can search for that number we can see the signals through with the vehicle is passed. 8 signals are placed and 8 are connected to the esp. only four signal has webcam. because its prototype
-  its a smart traffic system . its idealogy is to find the ambulance detection if the ambulance is detected in the signal that signal alone opens others are closed en suring the traffic free way for ambulance, another is signal light based onvehicle count. normally the timer is set in static im maing this changing based on the number of vehicles present in signal, another is for collision if there is a accident detect in cam or entered in the dashboard the signal so that the route is diverted to another. im using four webcam placed in the 4 signal, and esp 8266 for signal control and blynk to operate signal manually if required. see all these files in my github
+# Smart Traffic System
 
+A prototype adaptive traffic-signal controller with computer-vision based
+ambulance and accident detection, plus vehicle-plate tracking across an
+8-signal / 2-intersection layout.
+
+## Features
+- **Adaptive signal timing** — green time proportional to vehicle count per road
+- **Ambulance priority** — HSV flash-pattern detection (red+blue siren lights)
+  automatically opens the ambulance's signal and closes the rest
+- **Accident detection** — vehicles stationary for >15s flagged automatically;
+  manual reports also accepted from the dashboard
+- **Plate trail tracking** — every plate captured by every camera is logged
+  with timestamp, signal, and state, so a lost/stolen vehicle's path can be
+  reconstructed via the dashboard search
+- **Manual override** — force-green any signal from the dashboard or Blynk app
+
+## Architecture
+```
+[4 webcams] → camera.py
+              detector.py   (YOLOv8 + HSV ambulance flash)
+              ocr.py        (EasyOCR plate reading)
+              accident.py   (stationary-vehicle tracker)
+                            ↓
+              signal_logic.py (rotation, yellow, priority handling)
+                            ↓
+              communicator.py → ESP32 → 8 signals (16 R+G LEDs)
+                            ↓
+              database.py → SQLite (plates, events, signal log)
+                            ↓
+              dashboard.html (Flask /api/*)
+                            ←
+              Blynk app (manual override on phone)
+```
+
+## Files
+| File | Purpose |
+|---|---|
+| `app.py` | Flask server + background processing loop |
+| `camera.py` | Multi-camera capture threads |
+| `detector.py` | YOLOv8 vehicle detection + HSV ambulance flash |
+| `accident.py` | Stationary-vehicle tracker + manual flags |
+| `ocr.py` | EasyOCR Indian plate reading |
+| `signal_logic.py` | Signal state machine (rotation, yellow, priorities) |
+| `communicator.py` | HTTP POST signal states to ESP32 |
+| `database.py` | SQLite logging (plates, events, signals) |
+| `dashboard.html` | Web UI |
+| `esp32_traffic_controller.ino` | ESP32 firmware (HTTP + Blynk + LEDs) |
+
+## Hardware
+- **Laptop / Raspberry Pi** running Python
+- **4 USB webcams** (one per monitored road)
+- **ESP32 DevKit V1**
+- **16 LEDs + 16 × 220Ω resistors** (8 red, 8 green; yellow shown on dashboard only)
+- Optional: breadboard, jumper wires, 5V power supply
+
+## Pin Map (ESP32 → LEDs)
+| Signal | Red GPIO | Green GPIO |
+|---|---|---|
+| S1 | 13 | 14 |
+| S2 | 27 | 26 |
+| S3 | 25 | 33 |
+| S4 | 32 | 4  |
+| S5 | 16 | 17 |
+| S6 | 18 | 19 |
+| S7 | 21 | 22 |
+| S8 | 23 | 5  |
+
+## Camera → Signal Mapping
+Default mapping (edit `CAM_TO_SIGNALS` in `signal_logic.py` to match your layout):
+| Camera | Controls |
+|---|---|
+| Cam 0 (North) | S5 |
+| Cam 1 (East)  | S6 |
+| Cam 2 (South) | S7 |
+| Cam 3 (West)  | S8 |
+
+S1–S4 are signal-only poles on the opposite side of each intersection.
+
+## Setup
+
+### 1. Python side
+```bash
+pip install -r requirements.txt
+# First run will auto-download yolov8s.pt (~22 MB)
+python app.py
+# Dashboard: http://127.0.0.1:5000
+```
+
+### 2. ESP32 side
+1. Install Arduino IDE + ESP32 board package
+2. Install libraries: `Blynk`, `ArduinoJson`
+3. Open `esp32_traffic_controller.ino`
+4. Fill in `WIFI_SSID`, `WIFI_PASS`, `BLYNK_TEMPLATE_ID`, `BLYNK_AUTH_TOKEN`
+5. Upload to ESP32
+6. Open Serial Monitor @ 115200, note the assigned IP
+7. Edit `communicator.py` → set `ESP32_IP` to that address
+
+### 3. Blynk app
+1. Create a template with name "SmartTraffic"
+2. Add buttons V0–V7 (one per signal — "Force GREEN")
+3. Add button V8 ("AUTO — release override")
+4. Add the device, copy auth token into the `.ino`
+
+## Tuning
+| What | File | Knob |
+|---|---|---|
+| Ambulance sensitivity | `detector.py` | `RED_MIN_PIXELS`, `BLUE_MIN_PIXELS`, `FLASH_DELTA` |
+| How long until accident | `accident.py` | `STATIONARY_THRESHOLD` |
+| Movement tolerance | `accident.py` | `MOVEMENT_TOLERANCE` |
+| Green time bounds | `signal_logic.py` | `MIN_GREEN_TIME`, `MAX_GREEN_TIME` |
+| Yellow duration | `signal_logic.py` | `YELLOW_TIME` |
+| Congestion threshold | `signal_logic.py` | `CONGESTION_LIMIT` |
+| OCR frequency | `app.py` | `OCR_EVERY_N_CYCLES` |
+
+## API
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/status` | GET | Current full system state |
+| `/api/plates` | GET | Last 20 plate captures |
+| `/api/events` | GET | Last 15 events |
+| `/api/search/<plate>` | GET | Trail for a specific plate |
+| `/api/override/<cam>` | GET | Force GREEN on cam's signals |
+| `/api/auto` | GET | Resume auto mode |
+| `/api/allred` | GET | Emergency all-red |
+| `/api/accident/<cam>` | GET | Manual accident report |
+| `/api/accident_clear/<cam>` | GET | Clear manual accident |
+
+## Known Limitations
+- HSV ambulance detection depends on visible flashing lights — won't work
+  for ambulances with steady (non-flashing) markings
+- EasyOCR on CPU is slow; OCR runs every 3rd loop iteration by default
+- Single ESP32 drives all 8 signals — for production, would use one ESP32
+  per intersection
+- 16 LEDs only (R+G). Yellow phase exists in logic and dashboard but is not
+  physically shown. Switch to shift registers (74HC595) to add yellow LEDs.
+
+## License
+For educational use.
